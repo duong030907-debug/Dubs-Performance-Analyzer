@@ -47,6 +47,10 @@ namespace Analyzer.Profiling
         private static bool started;
         private static bool completed;
 
+        // Keep the tab visible while discovery is running; hide it afterwards if no
+        // third-party mod exposes any tick methods.
+        public static bool ShouldShowTab => !completed || GUIController.Tab(Category.Modded).entries.Count > 0;
+
         public static void Initialise()
         {
             if (started || completed)
@@ -56,6 +60,11 @@ namespace Analyzer.Profiling
 
             foreach (var mod in LoadedModManager.RunningMods)
             {
+                // Core and official DLC are not third-party mods and already have
+                // their own profiler categories.
+                if (IsCoreOrDlc(mod.PackageId))
+                    continue;
+
                 // Package IDs are unique; display names are not.
                 var modId = mod.PackageId;
                 var displayName = mod.Name;
@@ -155,9 +164,10 @@ namespace Analyzer.Profiling
 
         private static void CreateModEntry(string modId)
         {
-            if (!methodsByMod.TryGetValue(modId, out var methods))
-                methodsByMod.Add(modId, methods = new HashSet<MethodInfo>());
+            if (!methodsByMod.TryGetValue(modId, out var methods) || methods.Count == 0)
+                return;
 
+            // One entry represents all discovered tick methods belonging to this mod.
             var modName = modNamesById.TryGetValue(modId, out var displayName) ? displayName : modId;
             try
             {
@@ -178,6 +188,9 @@ namespace Analyzer.Profiling
 
         private static void CreateAllModsEntry()
         {
+            if (allModMethods.Count == 0)
+                return;
+
             const string entryName = "All Mods";
             const string typeName = "AllModsCombinedTickEntry";
 
@@ -231,6 +244,13 @@ namespace Analyzer.Profiling
                         modNameByMethod[method] = displayName;
                 }
             }
+        }
+
+        private static bool IsCoreOrDlc(string packageId)
+        {
+            return string.Equals(packageId, "ludeon.rimworld", StringComparison.OrdinalIgnoreCase) ||
+                   (!string.IsNullOrEmpty(packageId) &&
+                    packageId.StartsWith("ludeon.rimworld.", StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IsTickMethod(MethodInfo method)
