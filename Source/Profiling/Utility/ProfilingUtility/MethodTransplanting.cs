@@ -18,6 +18,7 @@ namespace Analyzer.Profiling
         public static readonly ConcurrentDictionary<MethodBase, Type> typeInfo = [];
         private static readonly ConcurrentDictionary<string, ConcurrentDictionary<Type, byte>> methodOwners = new();
         private static readonly ConcurrentDictionary<Type, byte> activeEntryTypes = new();
+        private static readonly ConcurrentDictionary<string, byte> activeMethodKeys = new();
 
         private static readonly MethodInfo IsMethodActiveMethod =
             AccessTools.Method(typeof(MethodTransplanting), nameof(IsMethodActive));
@@ -66,6 +67,7 @@ namespace Analyzer.Profiling
             typeInfo.Clear();
             methodOwners.Clear();
             activeEntryTypes.Clear();
+            activeMethodKeys.Clear();
         }
 
         public static void PatchMethods(Type type)
@@ -139,20 +141,29 @@ namespace Analyzer.Profiling
                 activeEntryTypes.TryAdd(type, 0);
             else
                 activeEntryTypes.TryRemove(type, out _);
+
+            // Rebuild only the keys owned by this entry. The hot profiling path
+            // then performs a single dictionary lookup instead of reflecting over
+            // every owner each time a tick method runs.
+            foreach (var pair in methodOwners)
+            {
+                if (!pair.Value.ContainsKey(type))
+                    continue;
+
+                if (pair.Value.Keys.Any(owner => activeEntryTypes.ContainsKey(owner)))
+                    activeMethodKeys.TryAdd(pair.Key, 0);
+                else
+                    activeMethodKeys.TryRemove(pair.Key, out _);
+            }
         }
 
         public static bool IsMethodActive(string key, Type fallbackType)
         {
-            if (methodOwners.TryGetValue(key, out var owners))
-            {
-                foreach (var owner in owners.Keys)
-                {
-                    if (activeEntryTypes.ContainsKey(owner))
-                        return true;
-                }
+            if (activeMethodKeys.ContainsKey(key))
+                return true;
 
+            if (methodOwners.ContainsKey(key))
                 return false;
-            }
 
             // Preserve custom-entry behavior when it uses a custom profiler key.
             return fallbackType != null && activeEntryTypes.ContainsKey(fallbackType);
