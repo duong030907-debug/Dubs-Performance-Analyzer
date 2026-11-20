@@ -34,9 +34,6 @@ namespace Analyzer
             Profiling.FrameBreakdown.Update();
 #endif
 
-            // Continue discovering mod tick methods in small batches.
-            Profiling.AllModsTickEntries.Update();
-
             if (TimeTillCleanup == -1) return;
 
             if (Profiling.Analyzer.CurrentlyProfiling)
