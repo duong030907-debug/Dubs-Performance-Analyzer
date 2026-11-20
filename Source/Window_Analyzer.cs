@@ -177,6 +177,9 @@ namespace Analyzer
 					GUIController.Tab(entry.category).entries.Add(entry, entry.type);
 			}
 
+			// Discover tick callbacks from loaded mods and add one profiler entry per mod.
+			AllModsTickEntries.Initialise();
+
 			Panel_Logs.Initialise();
 		}
 
