@@ -17,6 +17,7 @@ namespace Analyzer.Profiling
         public static readonly HashSet<MethodInfo> patchedMeths = [];
         public static readonly ConcurrentDictionary<MethodBase, Type> typeInfo = [];
         private static readonly ConcurrentDictionary<string, ConcurrentDictionary<Type, byte>> methodOwners = new();
+        private static readonly ConcurrentDictionary<Type, byte> activeEntryTypes = new();
 
         private static readonly MethodInfo IsMethodActiveMethod =
             AccessTools.Method(typeof(MethodTransplanting), nameof(IsMethodActive));
@@ -62,6 +63,7 @@ namespace Analyzer.Profiling
             patchedMeths.Clear();
             typeInfo.Clear();
             methodOwners.Clear();
+            activeEntryTypes.Clear();
         }
 
         public static void PatchMethods(Type type)
@@ -126,6 +128,17 @@ namespace Analyzer.Profiling
             }
         }
 
+        public static void SetEntryActive(Type type, bool active)
+        {
+            if (type == null)
+                return;
+
+            if (active)
+                activeEntryTypes.TryAdd(type, 0);
+            else
+                activeEntryTypes.TryRemove(type, out _);
+        }
+
         public static bool IsMethodActive(string key)
         {
             if (!methodOwners.TryGetValue(key, out var owners))
@@ -133,8 +146,7 @@ namespace Analyzer.Profiling
 
             foreach (var owner in owners.Keys)
             {
-                var activeField = AccessTools.Field(owner, "Active");
-                if (activeField != null && activeField.GetValue(null) is bool active && active)
+                if (activeEntryTypes.ContainsKey(owner))
                     return true;
             }
 
