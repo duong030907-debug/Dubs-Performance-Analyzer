@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using Verse;
 
 namespace Analyzer.Profiling
@@ -38,7 +39,9 @@ namespace Analyzer.Profiling
         // view to compare tick methods collected from every loaded mod.
         private static readonly HashSet<MethodInfo> allModMethods = new HashSet<MethodInfo>();
 
-        private static IEnumerator<Type> currentTypes;
+        private static Type[] currentTypes;
+        private static Task<Type[]> currentTypesTask;
+        private static int typeIndex;
         private static int assemblyIndex;
         private static int generatedTypeIndex;
         private static bool started;
@@ -92,38 +95,60 @@ namespace Analyzer.Profiling
             {
                 if (currentTypes == null)
                 {
-                    if (assemblyIndex >= assemblies.Count)
+                    if (currentTypesTask == null)
                     {
-                        CreateAllModsEntry();
-                        completed = true;
-                        assemblies.Clear();
-                        lastAssemblyIndexByMod.Clear();
-                        methodsByMod.Clear();
+                        if (assemblyIndex >= assemblies.Count)
+                        {
+                            CreateAllModsEntry();
+                            completed = true;
+                            assemblies.Clear();
+                            lastAssemblyIndexByMod.Clear();
+                            methodsByMod.Clear();
+                            return;
+                        }
+
+                        // Assembly.GetTypes() is synchronous, so perform it off the UI thread.
+                        var assembly = assemblies[assemblyIndex].Value;
+                        currentTypesTask = Task.Factory.StartNew(
+                            () => GetLoadableTypes(assembly).ToArray());
                         return;
                     }
 
-                    currentTypes = GetLoadableTypes(assemblies[assemblyIndex].Value).GetEnumerator();
+                    if (!currentTypesTask.IsCompleted)
+                        return;
+
+                    try
+                    {
+                        currentTypes = currentTypesTask.GetAwaiter().GetResult();
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Warning("[Analyzer] Failed to enumerate types in a mod assembly: " + e);
+                        currentTypes = Array.Empty<Type>();
+                    }
+
+                    currentTypesTask = null;
+                    typeIndex = 0;
                 }
 
-                if (!currentTypes.MoveNext())
+                if (typeIndex >= currentTypes.Length)
                 {
-                    currentTypes.Dispose();
                     currentTypes = null;
 
                     var finishedAssemblyIndex = assemblyIndex++;
-                    var finishedModName = assemblies[finishedAssemblyIndex].Key;
+                    var finishedModId = assemblies[finishedAssemblyIndex].Key;
 
                     // Do not wait for unrelated mods to finish scanning.
-                    if (lastAssemblyIndexByMod.TryGetValue(finishedModName, out var lastIndex) &&
+                    if (lastAssemblyIndexByMod.TryGetValue(finishedModId, out var lastIndex) &&
                         lastIndex == finishedAssemblyIndex)
                     {
-                        CreateModEntry(finishedModName);
+                        CreateModEntry(finishedModId);
                     }
 
                     continue;
                 }
 
-                ProcessType(assemblies[assemblyIndex].Key, currentTypes.Current);
+                ProcessType(assemblies[assemblyIndex].Key, currentTypes[typeIndex++]);
                 processed++;
             }
         }
