@@ -30,6 +30,9 @@ namespace Analyzer.Profiling
             new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, HashSet<MethodInfo>> methodsByMod =
             new Dictionary<string, HashSet<MethodInfo>>(StringComparer.OrdinalIgnoreCase);
+        // Combined method set backs the "All Mods" entry, allowing one profiler
+        // view to compare tick methods collected from every loaded mod.
+        private static readonly HashSet<MethodInfo> allModMethods = new HashSet<MethodInfo>();
 
         private static IEnumerator<Type> currentTypes;
         private static int assemblyIndex;
@@ -77,6 +80,7 @@ namespace Analyzer.Profiling
                 {
                     if (assemblyIndex >= assemblies.Count)
                     {
+                        CreateAllModsEntry();
                         completed = true;
                         assemblies.Clear();
                         lastAssemblyIndexByMod.Clear();
@@ -132,6 +136,26 @@ namespace Analyzer.Profiling
             }
         }
 
+        private static void CreateAllModsEntry()
+        {
+            const string entryName = "All Mods";
+            const string typeName = "AllModsCombinedTickEntry";
+
+            try
+            {
+                var type = DynamicTypeBuilder.CreateType(typeName, allModMethods);
+                var entry = Entry.Create(entryName, Category.Modded, type, true, true);
+
+                var moddedTab = GUIController.Tab(Category.Modded);
+                if (!moddedTab.entries.ContainsKey(entry))
+                    moddedTab.entries.Add(entry, type);
+            }
+            catch (Exception e)
+            {
+                Log.Error("[Analyzer] Failed to create combined modded tick entry: " + e);
+            }
+        }
+
         private static void ProcessType(string modName, Type type)
         {
             if (type == null)
@@ -155,7 +179,10 @@ namespace Analyzer.Profiling
             foreach (var method in declaredMethods)
             {
                 if (IsTickMethod(method))
+                {
                     methods.Add(method);
+                    allModMethods.Add(method);
+                }
             }
         }
 
