@@ -68,10 +68,10 @@ namespace Analyzer.Profiling
                 // punctuation and duplicate display names must not collide.
                 var typeName = "AllModsTickEntry" + index++;
                 var type = DynamicTypeBuilder.CreateType(typeName, pair.Value);
-                var entry = Entry.Create("All Mods - " + pair.Key, Category.Tick, type, true, true);
+                var entry = Entry.Create(pair.Key, Category.Modded, type, true, true);
 
-                if (!GUIController.Tab(Category.Tick).entries.ContainsKey(entry))
-                    GUIController.Tab(Category.Tick).entries.Add(entry, type);
+                if (!GUIController.Tab(Category.Modded).entries.ContainsKey(entry))
+                    GUIController.Tab(Category.Modded).entries.Add(entry, type);
             }
         }
 
