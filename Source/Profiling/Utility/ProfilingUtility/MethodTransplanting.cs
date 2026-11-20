@@ -92,6 +92,8 @@ namespace Analyzer.Profiling
             var methodKey = Utility.GetMethodKey(meth);
             methodOwners.GetOrAdd(methodKey, _ => new ConcurrentDictionary<Type, byte>())
                 .TryAdd(type, 0);
+            if (activeEntryTypes.ContainsKey(type))
+                activeMethodKeys.TryAdd(methodKey, 0);
 
             if (patchedMeths.Contains(meth))
             {
