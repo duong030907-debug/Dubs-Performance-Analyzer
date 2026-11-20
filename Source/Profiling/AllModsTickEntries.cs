@@ -59,6 +59,11 @@ namespace Analyzer.Profiling
                 if (string.IsNullOrEmpty(modId))
                     modId = "unknown-" + assemblies.Count + "-" + displayName;
 
+                // Entry lookup is name-based, so disambiguate duplicate display names.
+                if (LoadedModManager.RunningMods.Count(other =>
+                        string.Equals(other.Name, mod.Name, StringComparison.OrdinalIgnoreCase)) > 1)
+                    displayName += " (" + modId + ")";
+
                 modNamesById[modId] = displayName;
                 methodsByMod[modId] = new HashSet<MethodInfo>();
 
