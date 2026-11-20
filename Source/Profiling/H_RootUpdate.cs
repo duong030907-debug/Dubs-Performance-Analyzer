@@ -13,13 +13,13 @@ namespace Analyzer.Profiling
             ProfileController.gate = ProfileController.GateFor(GUIController.CurrentCategory);
             Profiler.ResetStack();
 
-            if (GUIController.CurrentCategory != Category.Tick)
+            if (!ProfileController.IsTickCategory(GUIController.CurrentCategory))
                 ProfileController.BeginUpdate();
         }
 
         public static void Postfix()
         {
-            if (GUIController.CurrentCategory != Category.Tick) // If we are tick, we will 'update' in the TickManager.DoSingleTick method
+            if (!ProfileController.IsTickCategory(GUIController.CurrentCategory)) // If we are tick, we will 'update' in the TickManager.DoSingleTick method
                 ProfileController.EndUpdate();
 
 #if V1_7

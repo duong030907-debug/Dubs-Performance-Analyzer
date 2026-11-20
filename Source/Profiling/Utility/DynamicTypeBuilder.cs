@@ -42,7 +42,7 @@ namespace Analyzer.Profiling
 
         public static Type CreateType(string input, HashSet<MethodInfo> methods)
         {
-            var name = string.Concat(input.Where(x => char.IsLetter(x) && !char.IsSymbol(x) && !char.IsWhiteSpace(x)));
+            var name = string.Concat(input.Where(x => char.IsLetterOrDigit(x) && !char.IsWhiteSpace(x)));
 
 #if DEBUG
             ThreadSafeLogger.Message($"[Analyzer] Converted the parameter called {input} into {name}, creating type");

@@ -35,6 +35,9 @@ namespace Analyzer.Profiling
         private static uint rootIndex = 0;
         public static float updateAverage;
         public static long cycle;
+        public static bool IsTickCategory(Category category) =>
+            category is Category.Tick or Category.Modded;
+
         public static bool WholeFrameRoot => GUIController.CurrentCategory is Category.GUI or Category.Patches;
 
         public const int PhaseTick = 1, PhaseUpdate = 2, PhaseGUI = 4, PhaseThread = 8;
@@ -48,7 +51,7 @@ namespace Analyzer.Profiling
 
         public static int GateFor(Category category) => category switch
         {
-            Category.Tick => PhaseTick,
+            Category.Tick or Category.Modded => PhaseTick,
             Category.Update => PhaseUpdate | PhaseTick,
             Category.GUI => PhaseGUI,
             _ => 0

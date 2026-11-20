@@ -16,6 +16,11 @@ namespace Analyzer.Profiling
     {
         public static readonly HashSet<MethodInfo> patchedMeths = [];
         public static readonly ConcurrentDictionary<MethodBase, Type> typeInfo = [];
+        private static readonly ConcurrentDictionary<string, ConcurrentDictionary<Type, byte>> methodOwners = new();
+        private static readonly ConcurrentDictionary<Type, byte> activeEntryTypes = new();
+
+        private static readonly MethodInfo IsMethodActiveMethod =
+            AccessTools.Method(typeof(MethodTransplanting), nameof(IsMethodActive));
 
         private static readonly HarmonyMethod transpiler = new(typeof(MethodTransplanting), nameof(Transpiler));
 
@@ -57,6 +62,8 @@ namespace Analyzer.Profiling
         {
             patchedMeths.Clear();
             typeInfo.Clear();
+            methodOwners.Clear();
+            activeEntryTypes.Clear();
         }
 
         public static void PatchMethods(Type type)
@@ -75,6 +82,13 @@ namespace Analyzer.Profiling
             
         internal static void UpdateMethod(Type type, MethodInfo meth)
         {
+            // A method may belong to several generated entries (for example, an
+            // individual mod entry and the combined All Mods entry). Keep every
+            // owner even though Harmony only needs to transpile the method once.
+            var methodKey = Utility.GetMethodKey(meth);
+            methodOwners.GetOrAdd(methodKey, _ => new ConcurrentDictionary<Type, byte>())
+                .TryAdd(type, 0);
+
             if (patchedMeths.Contains(meth))
             {
 #if DEBUG
@@ -112,6 +126,31 @@ namespace Analyzer.Profiling
             {
                 Task.Factory.StartNew(work);
             }
+        }
+
+        public static void SetEntryActive(Type type, bool active)
+        {
+            if (type == null)
+                return;
+
+            if (active)
+                activeEntryTypes.TryAdd(type, 0);
+            else
+                activeEntryTypes.TryRemove(type, out _);
+        }
+
+        public static bool IsMethodActive(string key)
+        {
+            if (!methodOwners.TryGetValue(key, out var owners))
+                return false;
+
+            foreach (var owner in owners.Keys)
+            {
+                if (activeEntryTypes.ContainsKey(owner))
+                    return true;
+            }
+
+            return false;
         }
 
         // This transpiler basically replicates ProfileController.Start, but in IL, and inside the method it is patching, to reduce as much overhead as
@@ -173,7 +212,8 @@ namespace Analyzer.Profiling
             // Active Check
             {
                 // if (CurType.Active & (Analyzer.CurrentlyProfiling & !Analyzer.CurrentlyPaused))
-                yield return new CodeInstruction(OpCodes.Ldsfld, curType.GetField("Active", BindingFlags.Public | BindingFlags.Static));
+                yield return new CodeInstruction(OpCodes.Ldstr, key);
+                yield return new CodeInstruction(OpCodes.Call, IsMethodActiveMethod);
 
                 yield return new CodeInstruction(OpCodes.Ldsfld, Analyzer_CurrentlyProfiling); // profiling
                 yield return new CodeInstruction(OpCodes.Ldsfld, Analyzer_CurrentyPaused); // !paused
@@ -306,8 +346,8 @@ namespace Analyzer.Profiling
                 // if (CurType.Active & (Analyzer.CurrentlyProfiling & !Analyzer.CurrentlyPaused))
                 CodeInstruction[] activeCheck =
                 [
-                    new(OpCodes.Ldsfld,
-                        curType.GetField("Active", BindingFlags.Public | BindingFlags.Static)),
+                    new(OpCodes.Ldstr, key),
+                    new(OpCodes.Call, IsMethodActiveMethod),
                     new(OpCodes.Ldsfld, Analyzer_CurrentlyProfiling), // profiling
 
                     new(OpCodes.Ldsfld, Analyzer_CurrentyPaused), // !paused

@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Analyzer.Profiling
 {
-    public enum Category { Settings, Tick, Update, GUI, Modder, Patches }
+    public enum Category { Settings, Tick, Modded, Update, GUI, Modder, Patches }
 
     public static class GUIController
     {
@@ -35,6 +35,7 @@ namespace Analyzer.Profiling
 
             addTab(() => Strings.tab_setting, () => Strings.tab_setting_desc, Category.Settings);
             addTab(() => Strings.tab_tick, () => Strings.tab_tick_desc, Category.Tick);
+            addTab(() => "Modded", () => "Tick profiling entries grouped by loaded mod", Category.Modded);
             addTab(() => Strings.tab_update, () => Strings.tab_update_desc, Category.Update);
             addTab(() => Strings.tab_gui, () => Strings.tab_gui_desc, Category.GUI);
             addTab(() => Strings.tab_patches, () => Strings.tab_patches_desc, Category.Patches);
