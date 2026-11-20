@@ -173,7 +173,7 @@ namespace Analyzer
         public static string frame_label_ticks => "frame.label.ticks".Tr();
         public static string frame_label_update => "frame.label.update".Tr();
         public static string frame_label_tab => "frame.label.tab".Tr();
-        public static string frame_root_tip(string title, string ms, string unit, string ticks, string frameMs, string pct) => "frame.root.tip".Translate(title, ms, unit, ticks, frameMs, pct);
+        public static string frame_root_tip(string title, string ms, string unit, string ticks, string frameMs, string pct) => string.Format("frame.root.tip".Tr(), title, ms, unit, ticks, frameMs, pct);
         public static string frame_row_tip(string label, string ms, string unit, string ticks, string frameMs, string rootPct, string noun, string framePct) => "frame.row.tip".Translate(label, ms, unit, ticks, frameMs, rootPct, noun, framePct);
         public static string frame_tab_heading(string title, string ms, string unit, string samples, string units, string listed, string pct) => "frame.tab.heading".Translate(title, ms, unit, samples, units, listed, pct);
         public static string frame_tab_heading_tip(string samples, string units, string noun, string listed) => "frame.tab.heading.tip".Translate(samples, units, noun, listed);
