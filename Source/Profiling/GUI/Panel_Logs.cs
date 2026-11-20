@@ -64,7 +64,7 @@ namespace Analyzer.Profiling
         }
 
         private static string CurrentCycleName
-            => GUIController.CurrentCategory == Category.Tick ? Strings.tab_tick : Strings.Frame;
+            => Panel_Logs.IsTickCategory ? Strings.tab_tick : Strings.Frame;
 
         public string Desc
         {
@@ -129,6 +129,9 @@ namespace Analyzer.Profiling
 
     public static class Panel_Logs
     {
+        private static bool IsTickCategory
+            => GUIController.CurrentCategory == Category.Tick || GUIController.CurrentCategory == Category.Modded;
+
         private static Listing_Standard listing = new Listing_Standard { maxOneColumn = true };
         private static Rect viewFrustum;
 
@@ -474,7 +477,7 @@ namespace Analyzer.Profiling
         private static (string title, string noun, string unit, string units) RootNames()
         {
             if (ProfileController.WholeFrameRoot) return (Strings.root_frame_title, Strings.root_frame_noun, Strings.unit_frame, Strings.unit_frames);
-            return GUIController.CurrentCategory == Category.Tick
+            return IsTickCategory
                 ? (Strings.root_tick_title, Strings.root_tick_noun, Strings.unit_tick, Strings.unit_ticks)
                 : (Strings.root_update_title, Strings.root_update_noun, Strings.unit_frame, Strings.unit_frames);
         }
@@ -540,14 +543,15 @@ namespace Analyzer.Profiling
             var category = GUIController.CurrentCategory;
             var parent = ProfileController.WholeFrameRoot ? (category == Category.GUI ? 2 : -1) : 1;
             var nested = !ProfileController.WholeFrameRoot;
-            var perFrame = category == Category.Tick ? (GUIElement_TPS.FPS > 0 ? GUIElement_TPS.TPS / (double)GUIElement_TPS.FPS : 0d) : 1d;
+            var isTickCategory = IsTickCategory;
+            var perFrame = isTickCategory ? (GUIElement_TPS.FPS > 0 ? GUIElement_TPS.TPS / (double)GUIElement_TPS.FPS : 0d) : 1d;
             var (title, noun, unit, units) = RootNames();
 
             var frame = FrameBreakdown.frameMs;
             var root = ProfileController.updateAverage;
             var listed = logs.Sum(l => l.self);
             var samples = Analyzer.GetCurrentLogCount;
-            var ticks = category == Category.Tick ? " " + Strings.frame_ticksperframe(perFrame.ToString("0.#")) : "";
+            var ticks = isTickCategory ? " " + Strings.frame_ticksperframe(perFrame.ToString("0.#")) : "";
 
             HeadingLabel(Heading(rect), Strings.frame_heading(frame.ToString("0.000"), (frame > 0 ? 1000d / frame : 0).ToString("0"), FrameBreakdown.samples.ToString()), Strings.frame_heading_tip, "frame.heading");
 
@@ -555,7 +559,7 @@ namespace Analyzer.Profiling
             var bar = new Rect(rect.x + gutter, rect.y + 19f, rect.width - gutter, 10f);
             var scale = frame > 0 ? bar.width / frame : 0d;
             FlameLabel(new Rect(rect.x, bar.y, gutter - 6f, bar.height), Strings.frame_label_whole);
-            FlameLabel(new Rect(rect.x, bar.y + 13f, gutter - 6f, bar.height), nested ? (category == Category.Tick ? Strings.frame_label_ticks : Strings.frame_label_update) : Strings.frame_label_tab);
+            FlameLabel(new Rect(rect.x, bar.y + 13f, gutter - 6f, bar.height), nested ? (isTickCategory ? Strings.frame_label_ticks : Strings.frame_label_update) : Strings.frame_label_tab);
             if (nested) FlameLabel(new Rect(rect.x, bar.y + 26f, gutter - 6f, bar.height), Strings.frame_label_tab);
             Widgets.DrawBoxSolid(bar, new Color(0.15f, 0.15f, 0.15f));
 
