@@ -21,6 +21,8 @@ namespace Analyzer.Profiling
 
         private static readonly MethodInfo IsMethodActiveMethod =
             AccessTools.Method(typeof(MethodTransplanting), nameof(IsMethodActive));
+        private static readonly MethodInfo Type_GetTypeFromHandle =
+            typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle), new[] { typeof(RuntimeTypeHandle) });
 
         private static readonly HarmonyMethod transpiler = new(typeof(MethodTransplanting), nameof(Transpiler));
 
@@ -139,18 +141,21 @@ namespace Analyzer.Profiling
                 activeEntryTypes.TryRemove(type, out _);
         }
 
-        public static bool IsMethodActive(string key)
+        public static bool IsMethodActive(string key, Type fallbackType)
         {
-            if (!methodOwners.TryGetValue(key, out var owners))
-                return false;
-
-            foreach (var owner in owners.Keys)
+            if (methodOwners.TryGetValue(key, out var owners))
             {
-                if (activeEntryTypes.ContainsKey(owner))
-                    return true;
+                foreach (var owner in owners.Keys)
+                {
+                    if (activeEntryTypes.ContainsKey(owner))
+                        return true;
+                }
+
+                return false;
             }
 
-            return false;
+            // Preserve custom-entry behavior when it uses a custom profiler key.
+            return fallbackType != null && activeEntryTypes.ContainsKey(fallbackType);
         }
 
         // This transpiler basically replicates ProfileController.Start, but in IL, and inside the method it is patching, to reduce as much overhead as
@@ -213,6 +218,8 @@ namespace Analyzer.Profiling
             {
                 // if (CurType.Active & (Analyzer.CurrentlyProfiling & !Analyzer.CurrentlyPaused))
                 yield return new CodeInstruction(OpCodes.Ldstr, key);
+                yield return new CodeInstruction(OpCodes.Ldtoken, curType);
+                yield return new CodeInstruction(OpCodes.Call, Type_GetTypeFromHandle);
                 yield return new CodeInstruction(OpCodes.Call, IsMethodActiveMethod);
 
                 yield return new CodeInstruction(OpCodes.Ldsfld, Analyzer_CurrentlyProfiling); // profiling
@@ -347,6 +354,8 @@ namespace Analyzer.Profiling
                 CodeInstruction[] activeCheck =
                 [
                     new(OpCodes.Ldstr, key),
+                    new(OpCodes.Ldtoken, curType),
+                    new(OpCodes.Call, Type_GetTypeFromHandle),
                     new(OpCodes.Call, IsMethodActiveMethod),
                     new(OpCodes.Ldsfld, Analyzer_CurrentlyProfiling), // profiling
 
