@@ -51,6 +51,10 @@ namespace Analyzer.Profiling
 
         private static void DrawTabs(Tab tab)
         {
+            // Advance discovery only while drawing the Modded tab; other tabs remain untouched.
+            if (tab.category == Category.Modded)
+                AllModsTickEntries.Update();
+
             DubGUI.ResetFont();
             yOffset += 40f;
 
