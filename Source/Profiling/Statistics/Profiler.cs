@@ -52,7 +52,7 @@ namespace Analyzer.Profiling
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Start()
         {
-            if (ProfileController.Gated) return;
+            if (global::Analyzer.Profiling.ProfileController.Gated) return;
             Push(this);
             stopwatch.Start();
             hitCounter++;
