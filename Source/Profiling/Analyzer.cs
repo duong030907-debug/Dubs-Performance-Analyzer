@@ -154,7 +154,7 @@ namespace Analyzer.Profiling
 
                 var key = value.key;
                 
-                var spike = value.FindSpikes(currentLogCount, GUIController.CurrentCategory == Category.Tick ? Strings.unit_ticks : Strings.unit_frames, out var spikeText, out var spikeCount);
+                var spike = value.FindSpikes(currentLogCount, ProfileController.IsTickCategory(GUIController.CurrentCategory) ? Strings.unit_ticks : Strings.unit_frames, out var spikeText, out var spikeCount);
                 newLogs.Add(new(currentLogCount, value.label, average, (float)max, key, (float)total, calls, maxCalls, value.type, value.meth, value.pinned)
                     { self = Math.Max(0d, average - value.ChildAverage(currentLogCount)), spike = spike, spikeText = spikeText, spikes = spikeCount, seenIn = value.seenIn });
             }
