@@ -64,7 +64,7 @@ namespace Analyzer.Profiling
         }
 
         private static string CurrentCycleName
-            => Panel_Logs.IsTickCategory ? Strings.tab_tick : Strings.Frame;
+            => ProfileController.IsTickCategory(GUIController.CurrentCategory) ? Strings.tab_tick : Strings.Frame;
 
         public string Desc
         {
