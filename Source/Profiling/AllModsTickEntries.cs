@@ -46,14 +46,18 @@ namespace Analyzer.Profiling
 
             foreach (var mod in LoadedModManager.RunningMods)
             {
+                // Keep an entry for every loaded mod, even if it has no matching tick methods.
+                if (!methodsByMod.ContainsKey(mod.Name))
+                    methodsByMod.Add(mod.Name, new HashSet<MethodInfo>());
+
                 foreach (var assembly in mod.assemblies.loadedAssemblies)
                 {
-                    if (!ModInfoCache.AssemblyToModname.TryGetValue(assembly.FullName, out var modName))
-                        continue;
-
-                    assemblies.Add(new KeyValuePair<string, Assembly>(modName, assembly));
-                    lastAssemblyIndexByMod[modName] = assemblies.Count - 1;
+                    assemblies.Add(new KeyValuePair<string, Assembly>(mod.Name, assembly));
+                    lastAssemblyIndexByMod[mod.Name] = assemblies.Count - 1;
                 }
+
+                if (!lastAssemblyIndexByMod.ContainsKey(mod.Name))
+                    CreateModEntry(mod.Name);
             }
         }
 
@@ -108,8 +112,8 @@ namespace Analyzer.Profiling
 
         private static void CreateModEntry(string modName)
         {
-            if (!methodsByMod.TryGetValue(modName, out var methods) || methods.Count == 0)
-                return;
+            if (!methodsByMod.TryGetValue(modName, out var methods))
+                methodsByMod.Add(modName, methods = new HashSet<MethodInfo>());
 
             try
             {
