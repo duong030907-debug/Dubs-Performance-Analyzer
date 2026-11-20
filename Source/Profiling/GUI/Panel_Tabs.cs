@@ -35,6 +35,15 @@ namespace Analyzer.Profiling
 
             foreach (var tab in tabs)
             {
+                if (tab.category == Category.Modded)
+                {
+                    // Continue discovery even when no entries exist yet. Once scanning
+                    // finishes, omit the tab entirely if no third-party tick methods were found.
+                    AllModsTickEntries.Update();
+                    if (!AllModsTickEntries.ShouldShowTab)
+                        continue;
+                }
+
                 if (tab.category == Category.Settings || tab.category == Category.Modded || tab.entries.Count > 0)
                 {
                     DrawTabs(tab);
@@ -51,10 +60,6 @@ namespace Analyzer.Profiling
 
         private static void DrawTabs(Tab tab)
         {
-            // Advance discovery only while drawing the Modded tab; other tabs remain untouched.
-            if (tab.category == Category.Modded)
-                AllModsTickEntries.Update();
-
             DubGUI.ResetFont();
             yOffset += 40f;
 
