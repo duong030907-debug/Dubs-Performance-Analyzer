@@ -153,9 +153,14 @@ namespace Analyzer.Profiling
                     continue;
 
                 var key = value.key;
-                
+                var label = value.label;
+                if (GUIController.CurrentEntry?.name == "All Mods" &&
+                    value.meth is MethodInfo method &&
+                    AllModsTickEntries.TryGetModName(method, out var modName))
+                    label = "[" + modName + "] " + label;
+
                 var spike = value.FindSpikes(currentLogCount, ProfileController.IsTickCategory(GUIController.CurrentCategory) ? Strings.unit_ticks : Strings.unit_frames, out var spikeText, out var spikeCount);
-                newLogs.Add(new(currentLogCount, value.label, average, (float)max, key, (float)total, calls, maxCalls, value.type, value.meth, value.pinned)
+                newLogs.Add(new(currentLogCount, label, average, (float)max, key, (float)total, calls, maxCalls, value.type, value.meth, value.pinned)
                     { self = Math.Max(0d, average - value.ChildAverage(currentLogCount)), spike = spike, spikeText = spikeText, spikes = spikeCount, seenIn = value.seenIn });
             }
 
