@@ -13,13 +13,13 @@ namespace Analyzer.Profiling
             outerPhase = ProfileController.phase;
             ProfileController.phase = ProfileController.PhaseTick;
 
-            if (GUIController.CurrentCategory == Category.Tick) // If we in Tick mode, start our update (can happen multiple times p frame)
+            if (ProfileController.IsTickCategory(GUIController.CurrentCategory)) // If we in Tick mode, start our update (can happen multiple times p frame)
                 ProfileController.BeginUpdate();
         }
 
         public static void Postfix()
         {
-            if (GUIController.CurrentCategory == Category.Tick) // If we in Tick mode, finish our update (can happen multiple times p frame)
+            if (ProfileController.IsTickCategory(GUIController.CurrentCategory)) // If we in Tick mode, finish our update (can happen multiple times p frame)
                 ProfileController.EndUpdate();
 
             ProfileController.phase = outerPhase;
