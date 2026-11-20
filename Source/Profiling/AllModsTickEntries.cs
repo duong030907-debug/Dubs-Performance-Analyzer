@@ -12,7 +12,7 @@ namespace Analyzer.Profiling
     /// </summary>
     internal static class AllModsTickEntries
     {
-        // Limit reflection work to a small batch of types per game update.
+        // Limit reflection work to a small batch of types per UI frame.
         private const int TypesPerUpdate = 30;
 
         private static readonly string[] TickMethodNames =
@@ -26,13 +26,13 @@ namespace Analyzer.Profiling
 
         private static readonly List<KeyValuePair<string, Assembly>> assemblies =
             new List<KeyValuePair<string, Assembly>>();
-        private static readonly SortedDictionary<string, HashSet<MethodInfo>> methodsByMod =
-            new SortedDictionary<string, HashSet<MethodInfo>>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, int> lastAssemblyIndexByMod =
+            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, HashSet<MethodInfo>> methodsByMod =
+            new Dictionary<string, HashSet<MethodInfo>>(StringComparer.OrdinalIgnoreCase);
 
         private static IEnumerator<Type> currentTypes;
         private static int assemblyIndex;
-        private static List<string> modsToCreate;
-        private static int modIndex;
         private static int generatedTypeIndex;
         private static bool started;
         private static bool completed;
@@ -48,67 +48,67 @@ namespace Analyzer.Profiling
             {
                 foreach (var assembly in mod.assemblies.loadedAssemblies)
                 {
-                    if (ModInfoCache.AssemblyToModname.TryGetValue(assembly.FullName, out var modName))
-                        assemblies.Add(new KeyValuePair<string, Assembly>(modName, assembly));
+                    if (!ModInfoCache.AssemblyToModname.TryGetValue(assembly.FullName, out var modName))
+                        continue;
+
+                    assemblies.Add(new KeyValuePair<string, Assembly>(modName, assembly));
+                    lastAssemblyIndexByMod[modName] = assemblies.Count - 1;
                 }
             }
         }
 
         /// <summary>
-        /// Called once per game update. Discovery and generated-entry creation
-        /// are both spread across updates.
+        /// Called only while the Modded tab is drawn. Each mod's entry is
+        /// created as soon as its final assembly has been scanned.
         /// </summary>
         public static void Update()
         {
             if (!started || completed)
                 return;
 
-            if (modsToCreate == null)
+            var processed = 0;
+            while (processed < TypesPerUpdate)
             {
-                var processed = 0;
-                while (processed < TypesPerUpdate)
+                if (currentTypes == null)
                 {
-                    if (currentTypes == null)
+                    if (assemblyIndex >= assemblies.Count)
                     {
-                        if (assemblyIndex >= assemblies.Count)
-                        {
-                            modsToCreate = methodsByMod.Keys.ToList();
-                            break;
-                        }
-
-                        currentTypes = GetLoadableTypes(assemblies[assemblyIndex].Value).GetEnumerator();
+                        completed = true;
+                        assemblies.Clear();
+                        lastAssemblyIndexByMod.Clear();
+                        methodsByMod.Clear();
+                        return;
                     }
 
-                    if (!currentTypes.MoveNext())
-                    {
-                        currentTypes.Dispose();
-                        currentTypes = null;
-                        assemblyIndex++;
-                        continue;
-                    }
-
-                    ProcessType(assemblies[assemblyIndex].Key, currentTypes.Current);
-                    processed++;
+                    currentTypes = GetLoadableTypes(assemblies[assemblyIndex].Value).GetEnumerator();
                 }
 
-                // The final assembly may have completed exactly at the batch
-                // boundary. Detect that on the next update rather than doing
-                // another full scan here.
-                return;
-            }
+                if (!currentTypes.MoveNext())
+                {
+                    currentTypes.Dispose();
+                    currentTypes = null;
 
-            if (modIndex >= modsToCreate.Count)
-            {
-                completed = true;
-                assemblies.Clear();
-                methodsByMod.Clear();
-                modsToCreate = null;
-                return;
-            }
+                    var finishedAssemblyIndex = assemblyIndex++;
+                    var finishedModName = assemblies[finishedAssemblyIndex].Key;
 
-            var modName = modsToCreate[modIndex++];
-            var methods = methodsByMod[modName];
-            if (methods.Count == 0)
+                    // Do not wait for unrelated mods to finish scanning.
+                    if (lastAssemblyIndexByMod.TryGetValue(finishedModName, out var lastIndex) &&
+                        lastIndex == finishedAssemblyIndex)
+                    {
+                        CreateModEntry(finishedModName);
+                    }
+
+                    continue;
+                }
+
+                ProcessType(assemblies[assemblyIndex].Key, currentTypes.Current);
+                processed++;
+            }
+        }
+
+        private static void CreateModEntry(string modName)
+        {
+            if (!methodsByMod.TryGetValue(modName, out var methods) || methods.Count == 0)
                 return;
 
             try
@@ -118,8 +118,9 @@ namespace Analyzer.Profiling
                 var type = DynamicTypeBuilder.CreateType(typeName, methods);
                 var entry = Entry.Create(modName, Category.Modded, type, true, true);
 
-                if (!GUIController.Tab(Category.Modded).entries.ContainsKey(entry))
-                    GUIController.Tab(Category.Modded).entries.Add(entry, type);
+                var moddedTab = GUIController.Tab(Category.Modded);
+                if (!moddedTab.entries.ContainsKey(entry))
+                    moddedTab.entries.Add(entry, type);
             }
             catch (Exception e)
             {
