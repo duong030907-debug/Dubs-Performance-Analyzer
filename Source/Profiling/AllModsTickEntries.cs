@@ -28,6 +28,10 @@ namespace Analyzer.Profiling
             new List<KeyValuePair<string, Assembly>>();
         private static readonly Dictionary<string, int> lastAssemblyIndexByMod =
             new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, string> modNamesById =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<MethodInfo, string> modNameByMethod =
+            new Dictionary<MethodInfo, string>();
         private static readonly Dictionary<string, HashSet<MethodInfo>> methodsByMod =
             new Dictionary<string, HashSet<MethodInfo>>(StringComparer.OrdinalIgnoreCase);
         // Combined method set backs the "All Mods" entry, allowing one profiler
@@ -49,18 +53,23 @@ namespace Analyzer.Profiling
 
             foreach (var mod in LoadedModManager.RunningMods)
             {
-                // Keep an entry for every loaded mod, even if it has no matching tick methods.
-                if (!methodsByMod.ContainsKey(mod.Name))
-                    methodsByMod.Add(mod.Name, new HashSet<MethodInfo>());
+                // Package IDs are unique; display names are not.
+                var modId = mod.PackageId;
+                var displayName = mod.Name;
+                if (string.IsNullOrEmpty(modId))
+                    modId = "unknown-" + assemblies.Count + "-" + displayName;
+
+                modNamesById[modId] = displayName;
+                methodsByMod[modId] = new HashSet<MethodInfo>();
 
                 foreach (var assembly in mod.assemblies.loadedAssemblies)
                 {
-                    assemblies.Add(new KeyValuePair<string, Assembly>(mod.Name, assembly));
-                    lastAssemblyIndexByMod[mod.Name] = assemblies.Count - 1;
+                    assemblies.Add(new KeyValuePair<string, Assembly>(modId, assembly));
+                    lastAssemblyIndexByMod[modId] = assemblies.Count - 1;
                 }
 
-                if (!lastAssemblyIndexByMod.ContainsKey(mod.Name))
-                    CreateModEntry(mod.Name);
+                if (!lastAssemblyIndexByMod.ContainsKey(modId))
+                    CreateModEntry(modId);
             }
         }
 
@@ -114,11 +123,12 @@ namespace Analyzer.Profiling
             }
         }
 
-        private static void CreateModEntry(string modName)
+        private static void CreateModEntry(string modId)
         {
-            if (!methodsByMod.TryGetValue(modName, out var methods))
-                methodsByMod.Add(modName, methods = new HashSet<MethodInfo>());
+            if (!methodsByMod.TryGetValue(modId, out var methods))
+                methodsByMod.Add(modId, methods = new HashSet<MethodInfo>());
 
+            var modName = modNamesById.TryGetValue(modId, out var displayName) ? displayName : modId;
             try
             {
                 // Numeric suffixes are preserved by DynamicTypeBuilder.
@@ -156,7 +166,12 @@ namespace Analyzer.Profiling
             }
         }
 
-        private static void ProcessType(string modName, Type type)
+        public static bool TryGetModName(MethodInfo method, out string modName)
+        {
+            return modNameByMethod.TryGetValue(method, out modName);
+        }
+
+        private static void ProcessType(string modId, Type type)
         {
             if (type == null)
                 return;
@@ -173,8 +188,8 @@ namespace Analyzer.Profiling
                 return;
             }
 
-            if (!methodsByMod.TryGetValue(modName, out var methods))
-                methodsByMod.Add(modName, methods = new HashSet<MethodInfo>());
+            if (!methodsByMod.TryGetValue(modId, out var methods))
+                methodsByMod.Add(modId, methods = new HashSet<MethodInfo>());
 
             foreach (var method in declaredMethods)
             {
@@ -182,6 +197,8 @@ namespace Analyzer.Profiling
                 {
                     methods.Add(method);
                     allModMethods.Add(method);
+                    if (modNamesById.TryGetValue(modId, out var displayName))
+                        modNameByMethod[method] = displayName;
                 }
             }
         }
