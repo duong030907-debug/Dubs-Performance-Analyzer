@@ -37,9 +37,6 @@ namespace Analyzer.Profiling
 
                     foreach (var type in GetLoadableTypes(assembly))
                     {
-                        if (type == null || type.IsAbstract && type.IsSealed)
-                            continue;
-
                         MethodInfo[] declaredMethods;
                         try
                         {
