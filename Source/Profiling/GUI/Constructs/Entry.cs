@@ -46,7 +46,10 @@ namespace Analyzer.Profiling
         public void SetActive(bool value)
         {
             if (type != null) // Active must be static here.
+            {
                 AccessTools.Field(type, "Active")?.SetValue(null, value);
+                MethodTransplanting.SetEntryActive(type, value);
+            }
 
             isActive = value;
         }
